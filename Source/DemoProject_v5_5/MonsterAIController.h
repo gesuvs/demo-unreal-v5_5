@@ -7,7 +7,7 @@
 
 #include "MonsterAIController.generated.h"
 
-class ASoundManager;
+class ANotificationManager;
 class AHidingSpot;
 class AMonsterCharacter;
 
@@ -34,8 +34,8 @@ public:
 	/** Referência para o monstro controlado */
 	AMonsterCharacter* ControlledMonster;
 
-	/** Referência para o SoundManager no mundo */
-	ASoundManager* SoundManager;
+	/** Referência para o NotificationManager no mundo */
+	ANotificationManager* NotificationManager;
 
 	/** Distância máxima para escutar barulhos */
 	static constexpr float NoiseDetectionRadius = 3000.0f;

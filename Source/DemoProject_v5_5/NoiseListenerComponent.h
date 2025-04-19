@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "SoundManager.h"
+#include "NotificationManager.h"
 #include "GameFramework/Character.h"  // For ACharacter
 
 #include "NoiseListenerComponent.generated.h"
@@ -50,10 +50,10 @@ public:
 
 	// Adicione esta propriedade
 	UPROPERTY()
-	ASoundManager* SoundManagerRef;
+	ANotificationManager* NotificationManagerRef;
 
 	// Adicione este método
-	void ValidateSoundManager();
+	void ValidateNotificationManager();
 
 	// Adicione para debug
 	UPROPERTY(EditAnywhere, Category = "Debug")

@@ -3,7 +3,7 @@
 
 #include "NoiseListenerComponent.h"
 
-#include "SoundManager.h"
+#include "NotificationManager.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Character.h"
@@ -41,8 +41,8 @@ void UNoiseListenerComponent::BeginPlay()
 	OnNoiseHeard.AddDynamic(this, &UNoiseListenerComponent::HandleNoiseHeard);
 
 
-	// Verificação inicial do SoundManager
-	ValidateSoundManager();
+	// Verificação inicial do NotificationManager
+	ValidateNotificationManager();
 }
 
 
@@ -67,15 +67,15 @@ void UNoiseListenerComponent::TickComponent(float DeltaTime, ELevelTick TickType
 
 	TimeSinceLastCheck = 0.0f;
 
-	// Verificação segura do SoundManager
-	if (!SoundManagerRef || !SoundManagerRef->IsValidLowLevel())
+	// Verificação segura do NotificationManager
+	if (!NotificationManagerRef || !NotificationManagerRef->IsValidLowLevel())
 	{
-		ValidateSoundManager();
-		if (!SoundManagerRef) return;
+		ValidateNotificationManager();
+		if (!NotificationManagerRef) return;
 	}
 
-	// ASoundManager* Manager = Cast<ASoundManager>(
-	//     UGameplayStatics::GetActorOfClass(GetWorld(), ASoundManager::StaticClass()));
+	// ANotificationManager* Manager = Cast<ANotificationManager>(
+	//     UGameplayStatics::GetActorOfClass(GetWorld(), ANotificationManager::StaticClass()));
 	//
 	//
 	// if (!Manager)
@@ -87,7 +87,7 @@ void UNoiseListenerComponent::TickComponent(float DeltaTime, ELevelTick TickType
 
 	const FVector ListenerLocation = Owner->GetActorLocation();
 
-	const TArray<FNoiseData> RecentNoises = SoundManagerRef->GetRecentNoises(RecentTimeWindow);
+	const TArray<FNotificationData> RecentNoises = NotificationManagerRef->GetRecentNotifications(RecentTimeWindow);
 
 	if (RecentNoises.Num() == 0)
 	{
@@ -100,7 +100,7 @@ void UNoiseListenerComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	}
 	bool bHeardNoise = false;
 
-	for (const FNoiseData& Noise : RecentNoises)
+	for (const FNotificationData& Noise : RecentNoises)
 	{
 		if (!Noise.Location.ContainsNaN() && Noise.Volume > 0.0f)
 		{
@@ -129,12 +129,12 @@ void UNoiseListenerComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	}
 }
 
-void UNoiseListenerComponent::ValidateSoundManager()
+void UNoiseListenerComponent::ValidateNotificationManager()
 {
-	SoundManagerRef = Cast<ASoundManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ASoundManager::StaticClass()));
-	if (!SoundManagerRef)
+	NotificationManagerRef = Cast<ANotificationManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ANotificationManager::StaticClass()));
+	if (!NotificationManagerRef)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SoundManager not found in level!"));
+		UE_LOG(LogTemp, Warning, TEXT("NotificationManager not found in level!"));
 	}
 }
 

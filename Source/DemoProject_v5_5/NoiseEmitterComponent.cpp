@@ -1,7 +1,7 @@
 #include "NoiseEmitterComponent.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/PlayerController.h"
-#include "SoundManager.h"
+#include "NotificationManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/PrimitiveComponent.h"
 
@@ -20,19 +20,19 @@ void UNoiseEmitterComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Inicializa SoundManager
+	// Inicializa NotificationManager
 	TArray<AActor*> FoundManagers;
 
 
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ASoundManager::StaticClass(), FoundManagers);
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ANotificationManager::StaticClass(), FoundManagers);
 
 	if (FoundManagers.Num() > 0)
 	{
-		SoundManager = Cast<ASoundManager>(FoundManagers[0]);
+		NotificationManager = Cast<ANotificationManager>(FoundManagers[0]);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("SoundManager não encontrado no mundo!"));
+		UE_LOG(LogTemp, Error, TEXT("NotificationManager não encontrado no mundo!"));
 	}
 
 
@@ -72,11 +72,11 @@ void UNoiseEmitterComponent::EmitNoise(float Volume, FVector Location)
 	}
 
 	// 2. Emitir o ruído na posição do mouse
-	if (NoiseLocation != FVector::ZeroVector && SoundManager && SoundManager->IsValidLowLevel())
+	if (NoiseLocation != FVector::ZeroVector && NotificationManager && NotificationManager->IsValidLowLevel())
 	{
 		float ClampedVolume = FMath::Clamp(Volume, MIN_NOISE_VOLUME, MAX_NOISE_VOLUME);
 
-		SoundManager->RegisterNoise(NoiseLocation, ClampedVolume);
+		NotificationManager->RegisterNotification(NoiseLocation, ClampedVolume);
 		// Debug
 		DrawDebugSphere(GetWorld(), NoiseLocation, 50.f, 12, FColor::Green, false, 2.f);
 
@@ -91,7 +91,7 @@ void UNoiseEmitterComponent::EmitNoise(float Volume, FVector Location)
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("Tentativa de emitir ruído sem SoundManager válido!"));
+		UE_LOG(LogTemp, Error, TEXT("Tentativa de emitir ruído sem NotificationManager válido!"));
 	}
 }
 
@@ -208,10 +208,10 @@ APawn* UNoiseEmitterComponent::GetControlledPawn(AActor* OwnerActor) const
 
 void UNoiseEmitterComponent::EmitNoiseFromActor(AActor* SourceActor)
 {
-	if (SourceActor && SoundManager)
+	if (SourceActor && NotificationManager)
 	{
 		FVector NoiseLocation = SourceActor->GetActorLocation();
-		SoundManager->RegisterNoise(NoiseLocation, BaseNoiseVolume);
+		NotificationManager->RegisterNotification(NoiseLocation, BaseNoiseVolume);
 		DrawDebugSphere(GetWorld(), NoiseLocation, 50.f, 12, FColor::Red, false, 2.f);
 	}
 }

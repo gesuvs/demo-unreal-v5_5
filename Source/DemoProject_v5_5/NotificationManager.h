@@ -2,11 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "SoundManager.generated.h"
+#include "NotificationManager.generated.h"
 
 // Estrutura que representa um dado de som registrado no mundo
 USTRUCT(BlueprintType)
-struct FNoiseData
+struct FNotificationData
 {
     GENERATED_BODY() // Adicione isso para estruturas USTRUCT
     
@@ -14,29 +14,29 @@ struct FNoiseData
     float Volume;
     float Timestamp;
 
-    FNoiseData() : Location(FVector::ZeroVector), Volume(0.0f), Timestamp(0.0f)
+    FNotificationData() : Location(FVector::ZeroVector), Volume(0.0f), Timestamp(0.0f)
     {
     }
 
-    FNoiseData(FVector InLocation, float InVolume, float InTimestamp)
+    FNotificationData(FVector InLocation, float InVolume, float InTimestamp)
         : Location(InLocation), Volume(InVolume), Timestamp(InTimestamp)
     {
     }
 };
 
 UCLASS()
-class DEMOPROJECT_V5_5_API ASoundManager : public AActor
+class DEMOPROJECT_V5_5_API ANotificationManager : public AActor
 {
     GENERATED_BODY()
 
 public:
-    ASoundManager();
+    ANotificationManager();
 
     // Registra um novo ruído no mundo
-    void RegisterNoise(FVector Location, float Volume);
+    void RegisterNotification(FVector Location, float Volume);
 
     // Retorna os ruídos recentes dentro de um intervalo de tempo (em segundos)
-    TArray<FNoiseData> GetRecentNoises(float WithinSeconds) const;
+    TArray<FNotificationData> GetRecentNotifications(float WithinSeconds) const;
 
 protected:
     void Tick(float DeltaTime) override;
@@ -44,7 +44,7 @@ protected:
 
 private:
     // Armazena os eventos de ruído ocorridos
-    TArray<FNoiseData> NoiseQueue;
+    TArray<FNotificationData> NoiseQueue;
 
     int32 NoiseStartIndex = 0; // Índice do primeiro ruído válido
     int32 NoiseCount = 0; // Número atual de ruídos válidos

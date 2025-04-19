@@ -36,9 +36,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
     float BaseNoiseVolume = 100.0f;
 
-    // A referência para o sistema de SoundManager que vai processar o ruído
+    // A referência para o sistema de NotificationManager que vai processar o ruído
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
-    class ASoundManager* SoundManager;
+    class ANotificationManager* NotificationManager;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "NoiseEmitter")
     UNoiseEmitterComponent* NoiseEmitterComponent;

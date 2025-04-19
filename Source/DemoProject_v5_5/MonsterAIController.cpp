@@ -1,6 +1,6 @@
 #include "MonsterAIController.h"
 #include "MonsterCharacter.h"
-#include "SoundManager.h"
+#include "NotificationManager.h"
 #include "HidingSpot.h"
 #include "NavigationSystem.h"
 #include "Kismet/GameplayStatics.h"
@@ -14,7 +14,7 @@ AMonsterAIController::AMonsterAIController()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	ControlledMonster = nullptr;
-	SoundManager = nullptr;
+	NotificationManager = nullptr;
 	CurrentHidingSpot = nullptr;
 }
 
@@ -24,30 +24,30 @@ void AMonsterAIController::BeginPlay()
 
 	SetTickableWhenPaused(true);
 	ControlledMonster = Cast<AMonsterCharacter>(GetPawn());
-	SoundManager = Cast<ASoundManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ASoundManager::StaticClass()));
+	NotificationManager = Cast<ANotificationManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ANotificationManager::StaticClass()));
 }
 
 void AMonsterAIController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (!ControlledMonster || !SoundManager)
+	if (!ControlledMonster || !NotificationManager)
 		return;
 
 	// Use um nome diferente para a variável local ou use o membro da classe diretamente
-	ASoundManager* FoundSoundManager = Cast<ASoundManager>(
-		UGameplayStatics::GetActorOfClass(GetWorld(), ASoundManager::StaticClass()));
+	ANotificationManager* FoundNotificationManager = Cast<ANotificationManager>(
+		UGameplayStatics::GetActorOfClass(GetWorld(), ANotificationManager::StaticClass()));
 
 	// Atribua ao membro da classe se necessário
-	SoundManager = FoundSoundManager;
+	NotificationManager = FoundNotificationManager;
 
 
 	// Verifica ruídos periodicamente
-	if (SoundManager)
+	if (NotificationManager)
 	{
-		TArray<FNoiseData> RecentNoises = SoundManager->GetRecentNoises(2.0f); // Ruídos dos últimos 2 segundos
+		TArray<FNotificationData> RecentNoises = NotificationManager->GetRecentNotifications(2.0f); // Ruídos dos últimos 2 segundos
 
-		for (const FNoiseData& Noise : RecentNoises)
+		for (const FNotificationData& Noise : RecentNoises)
 		{
 			float Distance = FVector::Dist(Noise.Location, GetPawn()->GetActorLocation());
 			if (CanHearNoise(Noise.Volume, Distance))
@@ -130,9 +130,9 @@ void AMonsterAIController::MoveToNoiseLocation(const FVector& NoiseLocation)
 
 void AMonsterAIController::ProcessHeardNoises()
 {
-	const TArray<FNoiseData> RecentNoises = SoundManager->GetRecentNoises(MaxNoiseAge);
+	const TArray<FNotificationData> RecentNoises = NotificationManager->GetRecentNotifications(MaxNoiseAge);
 
-	for (const FNoiseData& Noise : RecentNoises)
+	for (const FNotificationData& Noise : RecentNoises)
 	{
 		float Distance = FVector::Dist(Noise.Location, ControlledMonster->GetActorLocation());
 

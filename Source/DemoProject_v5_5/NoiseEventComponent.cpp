@@ -2,7 +2,7 @@
 #include "GameFramework/Actor.h"
 #include "Components/PrimitiveComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "SoundManager.h"
+#include "NotificationManager.h"
 
 static const float DEFAULT_BASE_NOISE_VOLUME = 20.0f;
 static const float DEFAULT_MAX_NOISE_VOLUME = 1000.0f;
@@ -47,14 +47,14 @@ void UNoiseEventComponent::OnComponentHit(UPrimitiveComponent* HitComponent, AAc
 	// Calcula o volume com base na intensidade do impacto e limita ao volume máximo
 	const float CalculatedVolume = FMath::Clamp(ImpactVelocity * BaseNoiseVolume, 0.0f, MaxNoiseVolume);
 
-	// Obtém o SoundManager e registra o ruído
+	// Obtém o NotificationManager e registra o ruído
 	if (UWorld* World = GetWorld())
 	{
-		ASoundManager* Manager = Cast<ASoundManager>(
-			UGameplayStatics::GetActorOfClass(World, ASoundManager::StaticClass()));
+		ANotificationManager* Manager = Cast<ANotificationManager>(
+			UGameplayStatics::GetActorOfClass(World, ANotificationManager::StaticClass()));
 		if (Manager)
 		{
-			Manager->RegisterNoise(GetOwner()->GetActorLocation(), CalculatedVolume);
+			Manager->RegisterNotification(GetOwner()->GetActorLocation(), CalculatedVolume);
 		}
 	}
 
