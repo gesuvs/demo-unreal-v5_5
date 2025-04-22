@@ -1,223 +1,96 @@
 #include "MonsterAIController.h"
 #include "MonsterCharacter.h"
-#include "SoundManager.h"
-#include "HidingSpot.h"
-#include "NavigationSystem.h"
-#include "Kismet/GameplayStatics.h"
-#include "GameFramework/Character.h"
-#include "NavMesh/NavMeshBoundsVolume.h"
 #include "DrawDebugHelpers.h" // For debug drawing
 
 #include "Navigation/PathFollowingComponent.h"
+#include "Perception/AIPerceptionComponent.h"
 
 AMonsterAIController::AMonsterAIController()
 {
 	PrimaryActorTick.bCanEverTick = true;
+
+	// Cria o componente de percepção
+	PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("PerceptionComponent"));
+	SetPerceptionComponent(*PerceptionComponent); // importante para GetPerceptionComponent funcionar
+
 	ControlledMonster = nullptr;
-	SoundManager = nullptr;
-	CurrentHidingSpot = nullptr;
+
+	HearingConfig = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("HearingConfig"));
+
+	if (HearingConfig)
+	{
+		HearingConfig->HearingRange = 2000.0f;
+		HearingConfig->DetectionByAffiliation.bDetectEnemies = true;
+		HearingConfig->DetectionByAffiliation.bDetectFriendlies = true;
+		HearingConfig->DetectionByAffiliation.bDetectNeutrals = true;
+
+		PerceptionComponent->ConfigureSense(*HearingConfig);
+		PerceptionComponent->SetDominantSense(HearingConfig->GetSenseImplementation());
+	}
 }
 
 void AMonsterAIController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	SetTickableWhenPaused(true);
 	ControlledMonster = Cast<AMonsterCharacter>(GetPawn());
-	SoundManager = Cast<ASoundManager>(UGameplayStatics::GetActorOfClass(GetWorld(), ASoundManager::StaticClass()));
+
+	if (GetPerceptionComponent())
+	{
+		GetPerceptionComponent()->OnTargetPerceptionUpdated.AddDynamic(
+			this, &AMonsterAIController::OnTargetPerceptionUpdated);
+		UE_LOG(LogTemp, Warning, TEXT("PerceptionComponent configurado com sucesso"));
+	}
 }
 
 void AMonsterAIController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-
-	if (!ControlledMonster || !SoundManager)
-		return;
-
-	// Use um nome diferente para a variável local ou use o membro da classe diretamente
-	ASoundManager* FoundSoundManager = Cast<ASoundManager>(
-		UGameplayStatics::GetActorOfClass(GetWorld(), ASoundManager::StaticClass()));
-
-	// Atribua ao membro da classe se necessário
-	SoundManager = FoundSoundManager;
+}
 
 
-	// Verifica ruídos periodicamente
-	if (SoundManager)
+void AMonsterAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
+{
+	UAISense_Hearing* HearingSense = NewObject<UAISense_Hearing>();
+
+	const FAISenseID HearingSenseID = HearingSense->GetSenseID();
+
+	if (Stimulus.WasSuccessfullySensed() && Stimulus.Type == HearingSenseID)
 	{
-		TArray<FNoiseData> RecentNoises = SoundManager->GetRecentNoises(2.0f); // Ruídos dos últimos 2 segundos
+		UE_LOG(LogTemp, Warning, TEXT("Inimigo ouviu som em %s"), *Stimulus.StimulusLocation.ToString());
 
-		for (const FNoiseData& Noise : RecentNoises)
+		if (ControlledMonster)
 		{
-			float Distance = FVector::Dist(Noise.Location, GetPawn()->GetActorLocation());
-			if (CanHearNoise(Noise.Volume, Distance))
+			FVector MonsterLocation = GetPawn() ? GetPawn()->GetActorLocation() : FVector::ZeroVector;
+			float DistanceToNoise = FVector::Dist(MonsterLocation, Stimulus.StimulusLocation);
+
+			// Mesmo valor usado no UAISenseConfig_Hearing
+			float MaxHearingRange = HearingConfig ? HearingConfig->HearingRange : 2000.f;
+
+			UE_LOG(LogTemp, Warning, TEXT("Distância até o barulho: %f"), DistanceToNoise);
+
+			if (DistanceToNoise <= MaxHearingRange)
 			{
-				OnNoiseHeard(Noise.Location, Noise.Volume);
-				break; // Reage apenas ao ruído mais relevante
-			}
-		}
-	}
+				// Está dentro do alcance, pode mover até o som
+				MoveToLocation(Stimulus.StimulusLocation);
 
-	// ProcessHeardNoises();
-}
-
-bool AMonsterAIController::CanHearNoise(float NoiseVolume, float Distance) const
-{
-	// Calcula a audibilidade baseada no volume e distância
-	float EffectiveRadius = HearingRadius * NoiseSensitivity * NoiseVolume;
-	return Distance <= EffectiveRadius;
-}
-
-void AMonsterAIController::OnNoiseHeard(FVector NoiseLocation, float NoiseVolume)
-{
-	LastHeardNoiseLocation = NoiseLocation;
-	LastHeardNoiseVolume = NoiseVolume;
-
-	if (AMonsterCharacter* Monster = Cast<AMonsterCharacter>(GetPawn()))
-	{
-		// Chama a função que dispara o evento e a lógica C++
-		Monster->HearNoise(NoiseLocation, NoiseVolume);
-	}
-}
-
-void AMonsterAIController::MoveToNoiseLocation(const FVector& NoiseLocation)
-{
-	UE_LOG(LogTemp, Warning, TEXT("ENTROU EM MoveToNoiseLocation")); // FORÇA O DEBUG
-
-	if (!GetPawn()) return;
-
-
-	// Modern way to get navigation system
-	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-
-	if (!NavSys)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Navigation system not found!"));
-	}
-
-	FNavLocation NavLocation;
-	const bool bProjectSuccess = NavSys->ProjectPointToNavigation(
-		NoiseLocation,
-		NavLocation,
-		FVector(500.f, 500.f, 500.f) // Search extent
-	);
-
-	if (bProjectSuccess)
-	{
-		// Create move request
-		FAIMoveRequest MoveRequest(NavLocation.Location);
-		MoveRequest.SetAcceptanceRadius(100.f);
-		MoveRequest.SetUsePathfinding(true);
-
-		// Execute move
-		FPathFollowingRequestResult Result = MoveTo(MoveRequest);
-
-		// Debug
-		if (bDrawDebug)
-		{
-			const float DebugDuration = 5.f;
-			DrawDebugSphere(GetWorld(), NavLocation.Location, 50.f, 12, FColor::Green, false, DebugDuration);
-			DrawDebugLine(GetWorld(), GetPawn()->GetActorLocation(), NavLocation.Location, FColor::Yellow, false,
-			              DebugDuration);
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Failed to project noise location to navmesh!"));
-	}
-}
-
-
-void AMonsterAIController::ProcessHeardNoises()
-{
-	const TArray<FNoiseData> RecentNoises = SoundManager->GetRecentNoises(MaxNoiseAge);
-
-	for (const FNoiseData& Noise : RecentNoises)
-	{
-		float Distance = FVector::Dist(Noise.Location, ControlledMonster->GetActorLocation());
-
-		if (Distance <= NoiseDetectionRadius && Noise.Volume >= ControlledMonster->GetNoiseSensitivity())
-		{
-			// Decide entre investigar, perseguir ou fugir
-			if (ControlledMonster->ShouldFlee())
-			{
-				FleeAndHide();
+				UE_LOG(LogTemp, Warning, TEXT("Indo investigar barulho..."));
 			}
 			else
 			{
-				MoveToLocation(Noise.Location);
-			}
-
-			break; // Apenas o barulho mais relevante
-		}
-	}
-}
-
-void AMonsterAIController::FleeAndHide()
-{
-	FVector PlayerLocation = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0)->GetActorLocation();
-	FVector EscapeDirection = ControlledMonster->GetActorLocation() - PlayerLocation;
-	EscapeDirection.Normalize();
-
-	FVector EscapeTarget = ControlledMonster->GetActorLocation() + EscapeDirection * MinEscapeDistance;
-
-	AHidingSpot* Spot = FindBestHidingSpot(ControlledMonster->GetCreatureSize());
-	if (Spot)
-	{
-		CurrentHidingSpot = Spot;
-		Spot->Occupy();
-		MoveToLocation(Spot->HidingPosition);
-	}
-	else
-	{
-		MoveToLocation(EscapeTarget); // Vai pra região mais escura
-	}
-}
-
-AHidingSpot* AMonsterAIController::FindBestHidingSpot(ECreatureSize MonsterSize) const
-{
-	TArray<AActor*> FoundSpots;
-	UGameplayStatics::GetAllActorsOfClass(GEngine->GetWorld(), AHidingSpot::StaticClass(), FoundSpots);
-
-	AHidingSpot* BestSpot = nullptr;
-	float BestScore = TNumericLimits<float>::Max();
-
-	for (AActor* Actor : FoundSpots)
-	{
-		AHidingSpot* Spot = Cast<AHidingSpot>(Actor);
-		if (Spot && Spot->CanBeUsedBy(MonsterSize))
-		{
-			float Distance = FVector::Dist(ControlledMonster->GetActorLocation(), Spot->HidingPosition);
-
-			// Simples critério de proximidade (pode evoluir com pesos)
-			if (Distance < BestScore)
-			{
-				BestScore = Distance;
-				BestSpot = Spot;
+				UE_LOG(LogTemp, Warning, TEXT("Som fora do alcance, ignorando"));
 			}
 		}
 	}
-
-	return BestSpot;
 }
 
-
-void AMonsterAIController::StopNoiseInvestigation()
-{
-	StopMovement();
-	CurrentNoiseLocation = FVector::ZeroVector;
-
-	// Implemente aqui qualquer lógica adicional quando a investigação terminar
-	UE_LOG(LogTemp, Warning, TEXT("Investigação do ruído concluída"));
-}
 
 void AMonsterAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
 {
 	Super::OnMoveCompleted(RequestID, Result);
 
 	const FString ResultString = UEnum::GetValueAsString(Result.Code);
-	UE_LOG(LogTemp, Verbose, TEXT("Movimento concluído com resultado: %s"), *ResultString);
-
+	UE_LOG(LogTemp, Warning, TEXT("Movimento concluído com resultado: %s"), *ResultString);
 
 	switch (Result.Code)
 	{
@@ -245,4 +118,9 @@ void AMonsterAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFo
 		UE_LOG(LogTemp, Warning, TEXT("Resultado inesperado: %s"), *ResultString);
 		break;
 	}
+}
+
+float AMonsterAIController::GetHearingRange() const
+{
+	return HearingConfig ? HearingConfig->HearingRange : 0.0f;
 }
